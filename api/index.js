@@ -1,11 +1,22 @@
-const express = require('express');
-const router = express.Router();
-const players = require('./players');
+// Add this to your existing api/index.js
+router.post('/admin/login', (req, res) => {
+  const { password } = req.body;
+  
+  if (!password) {
+    return res.status(400).json({ error: 'Password is required' });
+  }
 
-router.use('/players', players);
-
-router.get('/', (req, res) => {
-  res.json({ message: 'API is working' });
+  if (password === process.env.ADMIN_PASSWORD) {
+    const token = jwt.sign({ role: 'admin' }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    return res.json({ 
+      success: true,
+      token,
+      message: 'Login successful'
+    });
+  } else {
+    return res.status(401).json({ 
+      success: false,
+      error: 'Invalid password'
+    });
+  }
 });
-
-module.exports = router;

@@ -1,48 +1,13 @@
-DROP TABLE IF EXISTS players;
-DROP TABLE IF EXISTS events;
-DROP TABLE IF EXISTS weekly_rounds;
-DROP TABLE IF EXISTS weekly_results;
-DROP TABLE IF EXISTS scoring_system;
-DROP TABLE IF EXISTS prize_payouts;
-
-CREATE TABLE players (
+CREATE TABLE IF NOT EXISTS players (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
   handicap INTEGER
 );
 
-CREATE TABLE events (
+CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   date TEXT NOT NULL,
   course TEXT NOT NULL
-);
-
-CREATE TABLE weekly_rounds (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  eventId INTEGER NOT NULL,
-  date TEXT NOT NULL,
-  course TEXT NOT NULL,
-  FOREIGN KEY (eventId) REFERENCES events(id)
-);
-
-CREATE TABLE weekly_results (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  roundId INTEGER NOT NULL,
-  playerId INTEGER NOT NULL,
-  score INTEGER NOT NULL,
-  FOREIGN KEY (roundId) REFERENCES weekly_rounds(id),
-  FOREIGN KEY (playerId) REFERENCES players(id)
-);
-
-CREATE TABLE scoring_system (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  system TEXT NOT NULL
-);
-
-CREATE TABLE prize_payouts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  place INTEGER NOT NULL,
-  percentage REAL NOT NULL
 );

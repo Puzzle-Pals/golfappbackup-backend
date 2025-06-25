@@ -3,13 +3,30 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const adminRoutes = require('./admin');
-// ...import other routers as needed
 
 const router = express.Router();
+
+// Startup diagnostics (do not log secrets)
+if (!process.env.ADMIN_PASSWORD || !process.env.JWT_SECRET) {
+  console.error(
+    'Missing environment variables:',
+    {
+      ADMIN_PASSWORD: !!process.env.ADMIN_PASSWORD,
+      JWT_SECRET: !!process.env.JWT_SECRET
+    }
+  );
+}
 
 // --- Admin Login Endpoint ---
 router.post('/admin/login', (req, res) => {
   try {
+    if (!process.env.ADMIN_PASSWORD || !process.env.JWT_SECRET) {
+      return res.status(500).json({
+        success: false,
+        error: 'Server misconfiguration: Missing environment variables'
+      });
+    }
+
     const { password } = req.body;
 
     if (!password) {
@@ -48,6 +65,9 @@ router.post('/admin/login', (req, res) => {
 
 // --- JWT Middleware for Protected Routes ---
 const authenticateAdmin = (req, res, next) => {
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ error: 'Server misconfiguration: Missing JWT_SECRET' });
+  }
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'No token provided' });
 
@@ -71,8 +91,6 @@ router.get('/admin/check-auth', authenticateAdmin, (req, res) => {
 
 // --- Mount Other Routers, With JWT Middleware ---
 router.use('/admin', authenticateAdmin, adminRoutes);
-// ... mount other routers as needed, e.g.:
-// router.use('/events', eventsRoutes);
 
 router.use((req, res) => {
   res.status(404).json({ error: 'API route not found' });

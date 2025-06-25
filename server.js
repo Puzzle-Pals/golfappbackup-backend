@@ -2,6 +2,8 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
 const app = express();
 app.use(cors());
@@ -21,7 +23,6 @@ const scoreSchema = new mongoose.Schema({
     total: Number,
     course: String
 });
-
 const Score = mongoose.model('Score', scoreSchema);
 
 // Course Schema
@@ -32,10 +33,41 @@ const courseSchema = new mongoose.Schema({
         par: Number
     }]
 });
-
 const Course = mongoose.model('Course', courseSchema);
 
-// Routes
+// --- Admin Auth Middleware ---
+function adminAuth(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Malformed token' });
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (!decoded.admin) throw new Error("Not admin");
+        req.user = decoded;
+        next();
+    } catch (err) {
+        res.status(401).json({ error: 'Invalid token' });
+    }
+}
+
+// --- Admin Routes ---
+// POST /api/admin/login
+app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body;
+    if (!password || password !== process.env.ADMIN_PASSWORD) {
+        return res.status(401).json({ error: 'Invalid password' });
+    }
+    const token = jwt.sign({ admin: true }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token });
+});
+
+// GET /api/admin/check-auth (protected)
+app.get('/api/admin/check-auth', adminAuth, (req, res) => {
+    res.json({ success: true, message: 'You are authenticated as admin.' });
+});
+
+// --- Existing Routes ---
 app.get('/api/scores', async (req, res) => {
     try {
         const scores = await Score.find().sort({ date: -1 });
@@ -48,14 +80,12 @@ app.get('/api/scores', async (req, res) => {
 app.post('/api/scores', async (req, res) => {
     const { playerName, scores, course } = req.body;
     const total = scores.reduce((a, b) => a + b, 0);
-
     const score = new Score({
         playerName,
         scores,
         total,
         course
     });
-
     try {
         const newScore = await score.save();
         res.status(201).json(newScore);
@@ -83,7 +113,7 @@ app.post('/api/courses', async (req, res) => {
     }
 });
 
-// Admin route - no password protection but no links to it
+// Admin page (not linked, just static HTML)
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });

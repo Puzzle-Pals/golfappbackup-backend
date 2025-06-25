@@ -7,25 +7,22 @@ require('dotenv').config();
 
 const app = express();
 
-// ======= CORS SETUP =======
-// You may add more allowed origins as needed.
-const allowedOrigins = [
-  'https://golfappbackup-frontend.vercel.app', // Production frontend
-  'http://localhost:3000',                     // Local dev
-];
+// --- CORS: only allow Vercel frontend ---
+const allowedOrigin = 'https://golfappbackup-frontend.vercel.app';
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, etc.)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
-  credentials: true, // Allow cookies, authorization headers, etc.
+  origin: allowedOrigin,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-// ==========================
+
+// Ensure all preflight OPTIONS requests return CORS headers (for all routes)
+app.options('*', cors({
+  origin: allowedOrigin,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 
 app.use(express.json());
 

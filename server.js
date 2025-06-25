@@ -1,48 +1,44 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config();
-
-const apiRouter = require('./api/index.js');
+const path = require('path');
 
 const app = express();
 
-const allowedOrigin = 'https://bp-golf-app.vercel.app'; // Your actual frontend domain
-
-// CORS for all requests
+const allowedOrigin = 'https://golfappbackup-frontend.vercel.app'; // change to your frontend
 app.use(cors({
-  origin: allowedOrigin,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+    origin: allowedOrigin,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-
-// Handle preflight globally
 app.options('*', cors({
-  origin: allowedOrigin,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+    origin: allowedOrigin,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json());
 
-// Mount all your API routes under /api
-app.use('/api', apiRouter);
-
-// Fallback 404 for anything not handled
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
+// Connect to MongoDB
+mongoose.connect('mongodb://localhost:27017/bp-golf', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
 });
 
-// --- THIS IS THE CRITICAL PART FOR VERCEL ---
-module.exports = (req, res) => {
-  app(req, res);
-};
+// ...rest of your routes...
 
-// For local dev (optional, not used by Vercel)
-if (require.main === module) {
-  const PORT = process.env.PORT || 3000;
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-}
+// Serve static files
+app.use(express.static('public'));
+
+// REMOVE THIS:
+// const PORT = process.env.PORT || 3000;
+// app.listen(PORT, () => {
+//     console.log(`Server running on port ${PORT}`);
+// });
+
+// ADD THIS:
+module.exports = (req, res) => {
+    app(req, res);
+};

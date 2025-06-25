@@ -1,47 +1,97 @@
-require('dotenv').config();
 const express = require('express');
+const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
-const apiRoutes = require('./api');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-// Database setup
-const dbPath = path.resolve(__dirname, 'db/bp-golf-app.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Database error:', err);
-    process.exit(1);
-  }
-  console.log('Connected to SQLite database at', dbPath);
-});
-
-// Middleware
 app.use(cors());
 app.use(express.json());
 
+// Connect to MongoDB
+mongoose.connect('mongodb://localhost:27017/bp-golf', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+});
+
+// Score Schema
+const scoreSchema = new mongoose.Schema({
+    playerName: String,
+    date: { type: Date, default: Date.now },
+    scores: [Number],
+    total: Number,
+    course: String
+});
+
+const Score = mongoose.model('Score', scoreSchema);
+
+// Course Schema
+const courseSchema = new mongoose.Schema({
+    name: String,
+    holes: [{
+        holeNumber: Number,
+        par: Number
+    }]
+});
+
+const Course = mongoose.model('Course', courseSchema);
+
 // Routes
-app.use('/api', apiRoutes);
-
-// Health check
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
-    database: 'Connected',
-    timestamp: new Date().toISOString()
-  });
+app.get('/api/scores', async (req, res) => {
+    try {
+        const scores = await Score.find().sort({ date: -1 });
+        res.json(scores);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
 });
 
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.post('/api/scores', async (req, res) => {
+    const { playerName, scores, course } = req.body;
+    const total = scores.reduce((a, b) => a + b, 0);
+
+    const score = new Score({
+        playerName,
+        scores,
+        total,
+        course
+    });
+
+    try {
+        const newScore = await score.save();
+        res.status(201).json(newScore);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
 });
 
-// Clean exit
-process.on('SIGTERM', () => {
-  db.close();
-  server.close();
-  process.exit(0);
+app.get('/api/courses', async (req, res) => {
+    try {
+        const courses = await Course.find();
+        res.json(courses);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+app.post('/api/courses', async (req, res) => {
+    const course = new Course(req.body);
+    try {
+        const newCourse = await course.save();
+        res.status(201).json(newCourse);
+    } catch (err) {
+        res.status(400).json({ message: err.message });
+    }
+});
+
+// Admin route - no password protection but no links to it
+app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// Serve static files
+app.use(express.static('public'));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });

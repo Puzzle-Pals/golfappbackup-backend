@@ -1,14 +1,13 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
-const path = require('path');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const app = express();
 
-// --- CORS: only allow Vercel frontend ---
-const allowedOrigin = 'https://golfappbackup-frontend.vercel.app';
+// Only allow your deployed frontend
+const allowedOrigin = 'https://bp-golf-app.vercel.app'; // double-check your deployed frontend domain!
+
 app.use(cors({
   origin: allowedOrigin,
   credentials: true,
@@ -16,7 +15,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Ensure all preflight OPTIONS requests return CORS headers (for all routes)
+// Ensure preflight responses have CORS
 app.options('*', cors({
   origin: allowedOrigin,
   credentials: true,
@@ -26,119 +25,51 @@ app.options('*', cors({
 
 app.use(express.json());
 
-// Connect to MongoDB
-mongoose.connect('mongodb://localhost:27017/bp-golf', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-});
-
-// Score Schema
-const scoreSchema = new mongoose.Schema({
-    playerName: String,
-    date: { type: Date, default: Date.now },
-    scores: [Number],
-    total: Number,
-    course: String
-});
-const Score = mongoose.model('Score', scoreSchema);
-
-// Course Schema
-const courseSchema = new mongoose.Schema({
-    name: String,
-    holes: [{
-        holeNumber: Number,
-        par: Number
-    }]
-});
-const Course = mongoose.model('Course', courseSchema);
-
 // --- Admin Auth Middleware ---
 function adminAuth(req, res, next) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ error: 'No token provided' });
-    const token = authHeader.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'Malformed token' });
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        if (!decoded.admin) throw new Error("Not admin");
-        req.user = decoded;
-        next();
-    } catch (err) {
-        res.status(401).json({ error: 'Invalid token' });
-    }
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+  const token = authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Malformed token' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) throw new Error("Not admin");
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
 }
 
-// --- Admin Routes ---
+// --- Admin Login Route ---
 // POST /api/admin/login
 app.post('/api/admin/login', (req, res) => {
+  try {
     const { password } = req.body;
     if (!password || password !== process.env.ADMIN_PASSWORD) {
-        return res.status(401).json({ error: 'Invalid password' });
+      return res.status(401).json({ error: 'Invalid password' });
     }
     const token = jwt.sign({ admin: true }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token });
+    return res.json({ token });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 // GET /api/admin/check-auth (protected)
 app.get('/api/admin/check-auth', adminAuth, (req, res) => {
-    res.json({ success: true, message: 'You are authenticated as admin.' });
+  res.json({ success: true, message: 'You are authenticated as admin.' });
 });
 
-// --- Existing Routes ---
-app.get('/api/scores', async (req, res) => {
-    try {
-        const scores = await Score.find().sort({ date: -1 });
-        res.json(scores);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
+// --- 404 for all other /api/admin routes ---
+app.all('/api/admin*', (req, res) => {
+  res.status(404).json({ error: 'Not found' });
 });
 
-app.post('/api/scores', async (req, res) => {
-    const { playerName, scores, course } = req.body;
-    const total = scores.reduce((a, b) => a + b, 0);
-    const score = new Score({
-        playerName,
-        scores,
-        total,
-        course
-    });
-    try {
-        const newScore = await score.save();
-        res.status(201).json(newScore);
-    } catch (err) {
-        res.status(400).json({ message: err.message });
-    }
-});
-
-app.get('/api/courses', async (req, res) => {
-    try {
-        const courses = await Course.find();
-        res.json(courses);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
-
-app.post('/api/courses', async (req, res) => {
-    const course = new Course(req.body);
-    try {
-        const newCourse = await course.save();
-        res.status(201).json(newCourse);
-    } catch (err) {
-        res.status(400).json({ message: err.message });
-    }
-});
-
-// Admin page (not linked, just static HTML)
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
-
-// Serve static files
-app.use(express.static('public'));
+// --- No API calls should ever go to /admin or /admin.html, only /api/admin/* ---
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

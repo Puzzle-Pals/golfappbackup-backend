@@ -6,16 +6,26 @@ const Score = require('../models/Score');
 const Setting = require('../models/Setting');
 const XLSX = require('xlsx');
 const { createObjectCsvStringifier } = require('csv-writer');
+const jwt = require('jsonwebtoken');
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin1029';
-
-router.use((req, res, next) => {
-  const password = req.headers['x-admin-password'];
-  if (password !== ADMIN_PASSWORD) {
-    return res.status(401).json({ message: 'Unauthorized' });
+// --- Admin Auth Middleware ---
+function adminAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ message: 'No token provided' });
+  const token = authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'Malformed token' });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) throw new Error("Not admin");
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(401).json({ message: 'Invalid token' });
   }
-  next();
-});
+}
+
+// Apply adminAuth middleware to all routes in this file
+router.use(adminAuth);
 
 // Create Event
 router.post('/events', async (req, res) => {

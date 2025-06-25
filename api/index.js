@@ -7,8 +7,6 @@ const adminRoutes = require('./admin');
 
 const router = express.Router();
 
-router.use(express.json());
-
 // --- Admin Login Endpoint ---
 router.post('/admin/login', (req, res) => {
   try {
